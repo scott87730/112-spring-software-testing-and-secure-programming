@@ -52,12 +52,20 @@ test('Application selectNextPerson should select a person', async () => {
 test('Application notifySelected should call write and send', async () => {
     fs.writeFileSync(testNameListPath, 'Pan\nLuan\nWei');
 
-    // 使用Mock Object模擬MailSystem的write和send方法。
     const app = new Application();
     await new Promise(resolve => setTimeout(resolve, 100));
     app.selected = ['Pan'];
 
+    // Mocking MailSystem methods
+    app.mailSystem.write = (name) => `Mocked write for ${name}`;
+    app.mailSystem.send = (name, context) => {
+        console.log(`Mocked send for ${name} with context: ${context}`);
+        return true; // 假设总是成功
+    };
+
     app.notifySelected();
+
+    // 这里可以添加断言来检查mock是否被正确调用
 
     fs.unlinkSync(testNameListPath);
 });
