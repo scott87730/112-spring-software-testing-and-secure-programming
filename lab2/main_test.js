@@ -1,13 +1,10 @@
 const test = require('node:test');
 const assert = require('assert');
-const { Application, MailSystem } = require('./main');
 const fs = require('fs');
 const path = require('path');
+const { Application, MailSystem } = require('./main');
 
-// Create a temporary file for testing
-const testNameListPath = path.join(__dirname, 'name_list.txt');
-
-// Helper function for creating mock functions
+// 輔助函數：創建模擬函數
 function createMockFn(originalFn) {
     const mockFn = function(...args) {
         mockFn.calls.push(args);
@@ -17,73 +14,60 @@ function createMockFn(originalFn) {
     return mockFn;
 }
 
-// Prepare mock for console.log to avoid clutter during tests
-global.console = {
-    log: createMockFn(console.log)
-};
+// 暫時文件路徑
+const tempNameListPath = path.join(__dirname, 'name_list.txt');
 
-// Test for MailSystem.write
-test('MailSystem write should return correct context', async (t) => {
+// 測試前設置
+async function setup() {
+    fs.writeFileSync(tempNameListPath, 'Alice\nBob\nCharlie');
+}
+
+// 測試後清理
+async function teardown() {
+    fs.unlinkSync(tempNameListPath);
+}
+
+// MailSystem.write 測試
+test('MailSystem.write should return correct context', async (t) => {
     const mailSystem = new MailSystem();
-    assert.strictEqual(mailSystem.write('Pan'), 'Congrats, Pan!');
+    assert.strictEqual(mailSystem.write('Alice'), 'Congrats, Alice!');
     assert.strictEqual(mailSystem.write(null), 'Congrats, null!', 'Should handle null');
     assert.strictEqual(mailSystem.write(123), 'Congrats, 123!', 'Should handle numbers');
 });
 
-// Test for MailSystem.send
-test('MailSystem send should handle both success and failure', async (t) => {
+// MailSystem.send 測試
+test('MailSystem.send should handle both success and failure', async (t) => {
     const mailSystem = new MailSystem();
     let originalRandom = Math.random;
-    Math.random = () => 0.9; // Simulate success
-    assert.strictEqual(mailSystem.send('Pan', 'Congrats, Pan!'), true, 'Should send successfully');
-    Math.random = () => 0.1; // Simulate failure
-    assert.strictEqual(mailSystem.send('Luan', 'Sorry, Luan!'), false, 'Should fail to send');
-    Math.random = originalRandom; // Restore original Math.random
+    Math.random = () => 0.9; // 模擬發送成功
+    assert.strictEqual(mailSystem.send('Alice', 'Congrats, Alice!'), true, 'Should send successfully');
+    Math.random = () => 0.1; // 模擬發送失敗
+    assert.strictEqual(mailSystem.send('Bob', 'Sorry, Bob!'), false, 'Should fail to send');
+    Math.random = originalRandom; // 恢復原始 Math.random
 });
 
-// Test for Application constructor and getNames method
-test('Application constructor should initialize properties correctly', async (t) => {
-    fs.writeFileSync(testNameListPath, 'Pan\nLuan\nWei');
-    const app = new Application(testNameListPath);
-    await new Promise(resolve => setTimeout(resolve, 100)); // Simulate async operation
-    assert.strictEqual(app.people.length, 3, 'Should load 3 people');
-    assert.strictEqual(app.selected.length, 0, 'Selected should be empty initially');
-    fs.unlinkSync(testNameListPath);
-});
+// Application 類測試
+test('Application should initialize and function correctly', async (t) => {
+    await setup();
 
-// Test for Application.selectNextPerson
-test('Application selectNextPerson should select a person correctly', async (t) => {
-    fs.writeFileSync(testNameListPath, 'Pan\nLuan\nWei');
-    const app = new Application(testNameListPath);
-    await new Promise(resolve => setTimeout(resolve, 100)); // Simulate async operation
-    const person = app.selectNextPerson();
-    assert.ok(app.selected.includes(person), 'Selected person should be in selected array');
-    fs.unlinkSync(testNameListPath);
-});
-
-// Test for Application.notifySelected
-test('Application notifySelected should call write and send for each selected person', async (t) => {
-    fs.writeFileSync(testNameListPath, 'Pan\nLuan\nWei');
-
-    const app = new Application(testNameListPath);
+    // 確保使用 tempNameListPath 作為構造函數的參數
+    const app = new Application(tempNameListPath);
+    // 等待非同步操作完成
     await new Promise(resolve => setTimeout(resolve, 100));
-    app.selected = ['Pan', 'Luan'];
+    assert.strictEqual(app.people.length, 3, 'Should load 3 people');
 
-    app.mailSystem.write = createMockFn((name) => `Mocked write for ${name}`);
-    app.mailSystem.send = createMockFn((name, context) => {
-        console.log(`Mocked send for ${name} with context: ${context}`);
-        return true;
-    });
+    const selectedFirst = app.selectNextPerson();
+    assert.ok(app.selected.includes(selectedFirst), 'Selected person should be in selected array');
 
+    const selectedSecond = app.selectNextPerson();
+    assert.ok(app.selected.includes(selectedSecond), 'Second selected person should be in selected array');
+    assert.notStrictEqual(selectedFirst, selectedSecond, 'Should select different people');
+
+    app.mailSystem.write = createMockFn(app.mailSystem.write);
+    app.mailSystem.send = createMockFn(app.mailSystem.send);
     app.notifySelected();
+    assert.strictEqual(app.mailSystem.write.calls.length, 2, 'write should be called for each selected person');
+    assert.strictEqual(app.mailSystem.send.calls.length, 2, 'send should be called for each selected person');
 
-    assert.strictEqual(app.mailSystem.send.calls.length, 2, 'send should be called twice');
-    assert.strictEqual(app.mailSystem.write.calls.length, 2, 'write should be called twice');
-
-    fs.unlinkSync(testNameListPath);
+    await teardown();
 });
-
-// Additional tests could include:
-// - Testing Application.getRandomPerson for correct functionality.
-// - Testing error handling, for example, by mocking fs.readFile to throw an error.
-// - Testing boundary conditions, like selecting the same person multiple times or handling an empty name list.
