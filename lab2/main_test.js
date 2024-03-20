@@ -17,6 +17,11 @@ function createMockFn(originalFn) {
     return mockFn;
 }
 
+// Prepare mock for console.log to avoid clutter during tests
+global.console = {
+    log: createMockFn(console.log)
+};
+
 // Test for MailSystem.write
 test('MailSystem write should return correct context', async (t) => {
     const mailSystem = new MailSystem();
@@ -36,7 +41,7 @@ test('MailSystem send should handle both success and failure', async (t) => {
     Math.random = originalRandom; // Restore original Math.random
 });
 
-// Test for Application constructor
+// Test for Application constructor and getNames method
 test('Application constructor should initialize properties correctly', async (t) => {
     fs.writeFileSync(testNameListPath, 'Pan\nLuan\nWei');
     const app = new Application(testNameListPath);
@@ -77,3 +82,8 @@ test('Application notifySelected should call write and send for each selected pe
 
     fs.unlinkSync(testNameListPath);
 });
+
+// Additional tests could include:
+// - Testing Application.getRandomPerson for correct functionality.
+// - Testing error handling, for example, by mocking fs.readFile to throw an error.
+// - Testing boundary conditions, like selecting the same person multiple times or handling an empty name list.
