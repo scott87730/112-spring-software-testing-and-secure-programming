@@ -4,73 +4,74 @@ const { Application, MailSystem } = require('./main');
 const fs = require('fs');
 const path = require('path');
 
-// Test Stub
 // Create a temporary file for testing
 const testNameListPath = path.join(__dirname, 'name_list.txt');
 
-// Test Spy
-test('MailSystem write should return correct context', () => {
+test('MailSystem write should return correct context', async (t) => {
     const mailSystem = new MailSystem();
-    const context = mailSystem.write('Pan');
-    assert.strictEqual(context, 'Congrats, Pan!');
-
-    const context2 = mailSystem.write(null);
-    assert.strictEqual(context2, 'Congrats, null!', 'Error null');
-
-    const context3 = mailSystem.write(123);
-    assert.strictEqual(context3, 'Congrats, 123!', 'Error 123');
-
+    assert.strictEqual(mailSystem.write('Pan'), 'Congrats, Pan!');
+    assert.strictEqual(mailSystem.write(null), 'Congrats, null!', 'Should handle null');
+    assert.strictEqual(mailSystem.write(123), 'Congrats, 123!', 'Should handle numbers');
 });
 
-// Test Spy 
-test('MailSystem send should log output', () => {
+test('MailSystem send should handle both success and failure', async (t) => {
     const mailSystem = new MailSystem();
-    mailSystem.send('Pan', 'Congrats, Pan!');
+    // Simulating success
+    let originalRandom = Math.random;
+    Math.random = () => 0.9; // Simulate success
+    assert.strictEqual(mailSystem.send('Pan', 'Congrats, Pan!'), true, 'Should send successfully');
+    // Simulating failure
+    Math.random = () => 0.1; // Simulate failure
+    assert.strictEqual(mailSystem.send('Luan', 'Sorry, Luan!'), false, 'Should fail to send');
+    Math.random = originalRandom; // Restore original Math.random
 });
 
-// 測試Application函式是否正確初始化
-test('Application constructor should initialize properties', async () => {
+test('Application constructor should initialize properties correctly', async (t) => {
     fs.writeFileSync(testNameListPath, 'Pan\nLuan\nWei');
-
-    const app = new Application();
-    await new Promise(resolve => setTimeout(resolve, 100));
-
-    assert(Array.isArray(app.people));
-    assert(Array.isArray(app.selected));
-    assert(app.mailSystem instanceof MailSystem);
-
+    const app = new Application(testNameListPath);
+    await new Promise(resolve => setTimeout(resolve, 100)); // Simulate async operation
+    assert.strictEqual(app.people.length, 3, 'Should load 3 people');
+    assert.strictEqual(app.selected.length, 0, 'Selected should be empty initially');
     fs.unlinkSync(testNameListPath);
 });
 
-// 測試Application的selectNextPerson方法是否能正確選擇一個人
-test('Application selectNextPerson should select a person', async () => {
+test('Application selectNextPerson should select a person correctly', async (t) => {
     fs.writeFileSync(testNameListPath, 'Pan\nLuan\nWei');
-
-    const app = new Application();
-    await new Promise(resolve => setTimeout(resolve, 100));
-    app.people = ['Pan', 'Luan', 'Wei'];
-
+    const app = new Application(testNameListPath);
+    await new Promise(resolve => setTimeout(resolve, 100)); // Simulate async operation
     const person = app.selectNextPerson();
-    assert(app.selected.includes(person)); // 驗證選中的人是否在app.selected數組中
-
+    assert.ok(app.selected.includes(person), 'Selected person should be in selected array');
     fs.unlinkSync(testNameListPath);
 });
+// 在 Application notifySelected 測試之前，實現一個簡單的模擬函數
+function createMockFn(originalFn) {
+    const mockFn = function(...args) {
+        mockFn.calls.push(args);
+        return originalFn.apply(this, args);
+    };
+    mockFn.calls = [];
+    return mockFn;
+}
 
-test('Application notifySelected should call write and send', async () => {
+test('Application notifySelected should call write and send for each selected person', async () => {
     fs.writeFileSync(testNameListPath, 'Pan\nLuan\nWei');
 
     const app = new Application();
     await new Promise(resolve => setTimeout(resolve, 100));
-    app.selected = ['Pan'];
+    app.selected = ['Pan', 'Luan'];
 
-    // Mocking MailSystem methods
-    app.mailSystem.write = (name) => `Mocked write for ${name}`;
-    app.mailSystem.send = (name, context) => {
+    // 使用自定義模擬函數來裝飾原始方法
+    app.mailSystem.write = createMockFn((name) => `Mocked write for ${name}`);
+    app.mailSystem.send = createMockFn((name, context) => {
         console.log(`Mocked send for ${name} with context: ${context}`);
         return true;
-    };
+    });
 
     app.notifySelected();
+
+    // 檢查模擬函數的調用次數
+    assert.strictEqual(app.mailSystem.send.calls.length, 2, 'send should be called twice');
+    assert.strictEqual(app.mailSystem.write.calls.length, 2, 'write should be called twice');
 
     fs.unlinkSync(testNameListPath);
 });
