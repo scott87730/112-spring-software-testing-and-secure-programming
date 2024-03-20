@@ -13,6 +13,13 @@ test('MailSystem write should return correct context', () => {
     const mailSystem = new MailSystem();
     const context = mailSystem.write('Pan');
     assert.strictEqual(context, 'Congrats, Pan!');
+
+    const context2 = mailSystem.write(null);
+    assert.strictEqual(context2, 'Congrats, null!', 'Error null');
+
+    const context3 = mailSystem.write(123);
+    assert.strictEqual(context3, 'Congrats, 123!', 'Error 123');
+
 });
 
 // Test Spy 
