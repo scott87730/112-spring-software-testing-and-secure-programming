@@ -3,7 +3,6 @@ const assert = require('assert');
 const { Calculator } = require('./main');
 
 // TODO: write your tests here
-// <<<<<<< lab3
 // 定義測試套件
 describe('Calculator', () => {
     const calculator = new Calculator(); // 實例化計算器
@@ -57,5 +56,3 @@ describe('Calculator', () => {
         });
     });
 });
-// =======
-// >>>>>>> 511559023
